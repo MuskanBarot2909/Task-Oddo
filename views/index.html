@@ -1,0 +1,336 @@
+<!-- app/views/index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Search</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        #searchBar {
+            width: 80%;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        #content {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            width: 80%;
+        }
+
+        #courseList {
+            flex: 0 48%;
+            box-sizing: border-box;
+            text-align: left;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        #courseDetails {
+            flex: 0 48%;
+            box-sizing: border-box;
+            text-align: left;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="searchBar">
+        <h1>Course Search</h1>
+        <form id="searchForm">
+            <label for="searchQuery">Search:</label>
+            <input type="text" id="searchQuery" name="searchQuery">
+            <button type="submit">Search</button>
+        </form>
+        <div id="loginContainer">
+            <button id="loginButton" onclick="login()">Login</button>
+            <button id="logoutButton" onclick="logout()" disabled>Logout</button>
+        </div>
+    </div>
+
+    <div id="content">
+        <div id="courseList">
+            <h2>All Courses</h2>
+            <div id="listResults"></div>
+        </div>
+
+        <div id="courseDetails">
+            <h2>Course Details</h2>
+            <div id="detailsResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let isLoggedIn = false;
+
+        // Function to enable or disable login/logout buttons
+        function updateButtonState() {
+            const loginButton = document.getElementById('loginButton');
+            const logoutButton = document.getElementById('logoutButton');
+
+            // Enable or disable login/logout buttons based on the login status
+            loginButton.disabled = isLoggedIn;
+            logoutButton.disabled = !isLoggedIn;
+        }
+
+        // Function to format time difference for last activity
+        function formatTimeDifference(lastActivity) {
+            const now = new Date();
+            const diffInMilliseconds = now - lastActivity;
+            const minutes = Math.floor(diffInMilliseconds / (1000 * 60));
+
+            if (minutes < 60) {
+                return `${minutes === 0 ? 'less than 1 minute' : `${minutes} minute${minutes === 1 ? '' : 's'}`}`;
+            } else {
+                const hours = Math.floor(minutes / 60);
+                const remainingMinutes = minutes % 60;
+                return `${hours} hour${hours === 1 ? '' : 's'}${remainingMinutes > 0 ? ` ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}` : ''}`;
+            }
+        }
+
+        // Define a variable to store the current course ID
+        let currentCourseId = null;
+
+        document.getElementById('searchForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const searchQuery = document.getElementById('searchQuery').value;
+
+            if (searchQuery.trim() === '') {
+                // If the search bar is empty, fetch and display all courses
+                await fetchCourses();
+            } else {
+                // If the search bar is not empty, perform the search
+                const response = await fetch(`/search/${searchQuery}`);
+                const data = await response.json();
+                displayCourseList(data);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            await fetchCourses();
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const searchQuery = document.getElementById('searchQuery').value;
+            const response = await fetch(`/search/${searchQuery}`);
+            const data = await response.json();
+            displayCourseList(data);
+        });
+
+        async function fetchCourses() {
+            const response = await fetch('/courses');
+            const courses = await response.json();
+            displayCourseList(courses);
+        }
+
+        function displayCourseList(courses) {
+            const listResultsDiv = document.getElementById('listResults');
+            listResultsDiv.innerHTML = '';
+
+            if (!Array.isArray(courses)) {
+                console.error('Invalid response from the server:', courses);
+                return;
+            }
+
+            courses.forEach(course => {
+                const courseDiv = document.createElement('div');
+                courseDiv.innerHTML = `
+                    <p>Title: ${course.title}</p>
+                    <p>Description: ${course.description}</p>
+                    <p>Duration: ${course.duration}</p>
+                    <p>Tags: ${course.tags.map(tag => tag.name).join(', ')}</p>
+                    <button onclick="viewCourse('${course._id}', '${course.lastActivity}')">View Details</button>`;
+                listResultsDiv.appendChild(courseDiv);
+            });
+        }
+
+        async function viewCourse(courseId, lastActivity) {
+            // Store the current course ID in the variable
+            currentCourseId = courseId;
+
+            const response = await fetch(`/view/${courseId}`);
+            const data = await response.json();
+            displayCourseDetails(data, lastActivity);
+        }
+
+        function displayCourseDetails(data, lastActivity) {
+    const detailsResultsDiv = document.getElementById('detailsResults');
+    detailsResultsDiv.innerHTML = '';
+
+    const courseDetailsDiv = document.createElement('div');
+    courseDetailsDiv.innerHTML = `
+        <p>Title: ${data.course.title}</p>
+        <p>Description: ${data.course.description}</p>
+        <p>Duration: ${data.course.duration}</p>
+        <p>Students Enrolled: ${data.course.enrolledStudents}</p>
+        <p>Last Activity: ${formatTimeDifference(new Date(lastActivity))}</p>`;
+
+    // Add the "Join Course" button with an onclick event
+    if (isLoggedIn) {
+    courseDetailsDiv.innerHTML += `<button id="joinCourseButton" onclick="joinCourse()" ${
+        isLoggedIn ? '' : 'disabled'
+    }>Join Course</button>`;
+
+    // Check if the user is logged in before showing the "Give Rating" button
+   
+        // Add the "Give Rating" button with an onclick event
+        courseDetailsDiv.innerHTML += `<button id="giveRatingButton" onclick="giveRating()">Give Rating</button>`;
+    }
+
+    detailsResultsDiv.appendChild(courseDetailsDiv);
+}
+
+
+        async function joinCourse() {
+            // Check if the user is logged in before allowing to join
+            if (!isLoggedIn) {
+                alert('Please log in before joining a course.');
+                return;
+            }
+
+            const courseId = getCourseId();
+
+            if (courseId) {
+                try {
+                    const response = await fetch(`/joinCourse/${courseId}`, { method: 'POST' });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to join course. Server responded with status ${response.status}.`);
+                    }
+
+                    const data = await response.json();
+
+                    document.getElementById('detailsResults').innerHTML = `
+                        <p>Title: ${data.title}</p>
+                        <p>Description: ${data.description}</p>
+                        <p>Duration: ${data.duration}</p>
+                        <p>Students Enrolled: ${data.enrolledStudents}</p>
+                        <p>Last Activity: ${formatTimeDifference(data.lastActivity)}</p>`;
+
+                    alert(`You have joined the course: ${data.title}\nStudents Enrolled: ${data.enrolledStudents}`);
+
+                    // Reload the page after successful joinCourse
+                    location.reload();
+                } catch (error) {
+                    console.error('Error joining course:', error);
+                    alert('Error joining course. Please try again.');
+                }
+            } else {
+                alert('No course selected.');
+            }
+        }
+
+        // Function to retrieve the current course ID
+        function getCourseId() {
+            return currentCourseId;
+        }
+
+        // Function to check the user's login status
+        async function checkLoggedIn() {
+            try {
+                const response = await fetch('/checkLoggedIn');
+                const data = await response.json();
+
+                isLoggedIn = data.loggedIn;
+                // Update button states based on login status
+                updateButtonState();
+            } catch (error) {
+                console.error('Error checking login status:', error);
+            }
+        }
+
+        // Function to perform login
+        function login() {
+            fetch('/generateSession')
+                .then(response => response.json())
+                .then(data => {
+                    // Assuming the response contains the generated access token
+
+                    // Save the access token to the database or use it as needed
+
+                    // Update login status and button states
+                    isLoggedIn = true;
+                    updateButtonState();
+
+                    // Redirect to the main page (adjust the path as needed)
+                    window.location.href = '/';
+                })
+                .catch(error => console.error('Error during login:', error));
+        }
+
+        // Function to perform logout
+        function logout() {
+            fetch('/logout', { method: 'POST' })
+                .then(() => {
+                    // Update login status and button states
+                    isLoggedIn = false;
+                    updateButtonState();
+
+                    // Redirect to the main page (adjust the path as needed)
+                    window.location.href = '/';
+                })
+                .catch(error => console.error('Error during logout:', error));
+        }
+
+function giveRating() {
+    // Get the rating from the user (you may implement a prompt or use a form)
+    const rating = prompt('Enter your rating (1-5):');
+
+    // Check if the rating is valid
+    if (rating >= 1 && rating <= 5) {
+        const courseId = getCourseId();
+
+        if (courseId) {
+            // Send a request to the server to submit the rating
+            fetch('/giveRate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    courseId,
+                    userId: 'user_id', // Replace with actual user ID if available
+                    rating: parseInt(rating),
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                })
+                .catch(error => {
+                    console.error('Error giving rating:', error);
+                    alert('Error giving rating. Please try again.');
+                });
+        } else {
+            alert('No course selected.');
+        }
+    } else {
+        alert('Invalid rating. Please enter a rating between 1 and 5.');
+    }
+}
+
+
+        
+
+        // Call checkLoggedIn on page load to set initial button states
+        document.addEventListener('DOMContentLoaded', checkLoggedIn);
+    </script>
+</body>
+
+</html>
